@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyFinance Hub</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('https://img.freepik.com/premium-vector/dollar-money-background-big-pile-paper-cash-backdrop-large-heap-currency-bill-banknotes-million-dollars_212005-578.jpg?semt=ais_hybrid') no-repeat center center fixed;
+            background-size: cover;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #218838;
+        }
+        .result {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        .total {
+            text-align: center;
+            margin-top: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .receipt {
+            margin-top: 10px;
+        }
+        img {
+            max-width: 100px;
+            max-height: 100px;
+            display: block;
+            margin-top: 5px;
+        }
+        .delete-button {
+            background: #dc3545;
+            margin-top: 5px;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .delete-button:hover {
+            background: #c82333;
+        }
+        .menu {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+        .menu a {
+            margin: 0 10px;
+            text-decoration: none;
+            color: white;
+            font-weight: bold;
+        }
+        .menu a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            margin-top: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="menu">
+        <a href="#" onclick="showMainPage()">Main Page</a>
+        <a href="#" onclick="showHistoryPage()">History Page</a>
+    </div>
+
+    <div class="content">
+        <div class="container" id="main-page">
+            <h1>EasyFinance Hub</h1>
+            <div class="form-group">
+                <label for="amount">Enter Amount in Somaliland Shillings:</label>
+                <input type="number" id="amount" placeholder="Enter amount">
+            </div>
+            <div class="form-group">
+                <label for="receipt">Upload Receipt:</label>
+                <input type="file" id="receipt" accept="image/*">
+            </div>
+            <button onclick="addAmount()">Add Amount</button>
+            <div class="result" id="result"></div>
+            <div class="total" id="total"></div>
+        </div>
+
+        <div class="container" id="history-page" style="display: none;">
+            <h1>History Page</h1>
+            <div class="form-group">
+                <label for="filter">Filter by Date:</label>
+                <input type="date" id="filter">
+            </div>
+            <button onclick="filterHistory()">View History</button>
+            <div class="result" id="history-result"></div>
+            <div class="total" id="history-total"></div>
+        </div>
+    </div>
+
+    <script>
+        let amounts = JSON.parse(localStorage.getItem('amounts')) || [];
+        const conversionRate = 1 / 9000; // 1 USD = 9000 SLS
+
+        function addAmount() {
+            const amountInput = document.getElementById("amount");
+            const receiptInput = document.getElementById("receipt");
+            const amount = parseFloat(amountInput.value);
+
+            if (isNaN(amount) || amount <= 0) {
+                alert("Please enter a valid amount.");
+                return;
+            }
+
+            const receiptFile = receiptInput.files[0];
+
+            if (receiptFile) {
+                const reader = new FileReader();
+
+                reader.onloadend = function() {
+                    const receiptBase64 = reader.result;
+
+                    const entry = {
+                        amount,
+                        receipt: receiptBase64,
+                        date: new Date().toISOString().split('T')[0]
+                    };
+
+                    amounts.push(entry);
+                    localStorage.setItem('amounts', JSON.stringify(amounts));
+
+                    amountInput.value = "";
+                    receiptInput.value = "";
+
+                    displayResults();
+                };
+
+                reader.readAsDataURL(receiptFile); // Convert receipt to Base64
+            } else {
+                const entry = {
+                    amount,
+                    receipt: null,
+                    date: new Date().toISOString().split('T')[0]
+                };
+
+                amounts.push(entry);
+                localStorage.setItem('amounts', JSON.stringify(amounts));
+
+                amountInput.value = "";
+                receiptInput.value = "";
+
+                displayResults();
+            }
+        }
+
+        function deleteAmount(index) {
+            amounts.splice(index, 1);
+            localStorage.setItem('amounts', JSON.stringify(amounts));
+            displayResults();
+        }
+
+        function displayResults() {
+            const resultDiv = document.getElementById("result");
+            const totalDiv = document.getElementById("total");
+
+            let totalSLS = 0;
+            let totalUSD = 0;
+
+            resultDiv.innerHTML = "";
+
+            amounts.forEach((entry, index) => {
+                const convertedAmount = (entry.amount * conversionRate).toFixed(2);
+                totalSLS += entry.amount;
+                totalUSD += parseFloat(convertedAmount);
+
+                resultDiv.innerHTML += `
+                    <div>
+                        <p>Amount ${index + 1}: SLS ${entry.amount.toFixed(2)} = USD ${convertedAmount}</p>
+                        ${entry.receipt ? `<img src="${entry.receipt}" alt="Receipt">` : ""}
+                        <button class='delete-button' onclick='deleteAmount(${index})'>Delete</button>
+                    </div>
+                `;
+            });
+
+            totalDiv.innerHTML = `<strong>Total:</strong> SLS ${totalSLS.toFixed(2)} | USD ${totalUSD.toFixed(2)}`;
+        }
+
+        function filterHistory() {
+            const filterInput = document.getElementById("filter").value;
+            const historyResult = document.getElementById("history-result");
+            const historyTotalDiv = document.getElementById("history-total");
+
+            historyResult.innerHTML = "";
+            historyTotalDiv.innerHTML = "";
+
+            const filteredAmounts = amounts.filter(entry => entry.date === filterInput);
+
+            if (filteredAmounts.length === 0) {
+                historyResult.innerHTML = `<p>No records found for the selected date.</p>`;
+                return;
+            }
+
+            let totalSLS = 0;
+            let totalUSD = 0;
+
+            filteredAmounts.forEach((entry, index) => {
+                const convertedAmount = (entry.amount * conversionRate).toFixed(2);
+                totalSLS += entry.amount;
+                totalUSD += parseFloat(convertedAmount);
+
+                historyResult.innerHTML += `
+                    <div>
+                        <p>Amount ${index + 1}: SLS ${entry.amount.toFixed(2)} = USD ${convertedAmount} (Date: ${entry.date})</p>
+                        ${entry.receipt ? `<img src="${entry.receipt}" alt="Receipt">` : ""}
+                    </div>
+                `;
+            });
+
+            historyTotalDiv.innerHTML = `<strong>Total:</strong> SLS ${totalSLS.toFixed(2)} | USD ${totalUSD.toFixed(2)}`;
+        }
+
+        function showMainPage() {
+            document.getElementById("main-page").style.display = "block";
+            document.getElementById("history-page").style.display = "none";
+        }
+
+        function showHistoryPage() {
+            document.getElementById("main-page").style.display = "none";
+            document.getElementById("history-page").style.display = "block";
+        }
+
+        // Display data on page load
+        window.onload = function () {
+            displayResults();
+        };
+    </script>
+</body>
+</html>
